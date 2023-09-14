@@ -34,6 +34,11 @@
 
 ;; OpenAI model settings
 
+(defcustom vips-system-message "You are a helpful assistant"
+  "System message sent to OpenAI API."
+  :type 'string
+  :group 'vips)
+
 (defcustom vips-max-tokens 4000
   "The max-tokens paramater that vips.el sends to OpenAI API."
   :type 'integer
@@ -110,7 +115,7 @@
       vips-openai-api-url
       :type "POST"
       :data (json-encode `(("model" . ,model)
-                           ("messages" . ((("role" . "system") ("content" . "Answer or complete if input is a question or instruction; otherwise, complete the input."))
+                           ("messages" . ((("role" . "system") ("content" . ,vips-system-message))
                                          (("role" . "user") ("content" . ,prompt))))
                            ("max_tokens" . ,vips-max-tokens)
                            ("temperature" . ,vips-temperature)
@@ -134,119 +139,80 @@
 (defun vips--openai-chat (model prompt)
   (vips--openai-api-request openai-api-key model prompt))
 
+(defun vips-get-region-or-paragraph ()
+  "Return the start and end of the selected region or the current paragraph."
+  (if (use-region-p)
+      (list (region-beginning) (region-end))
+    (list (save-excursion
+            (backward-paragraph)
+            (point))
+          (save-excursion
+            (forward-paragraph)
+            (point)))))
+
 (defun vips-chat-region (start end model)
   "Send region or paragraph to OpenAI and insert result to end of region. \n\n START and END are selected region boundaries."
   (interactive "r")
   (vips-process-region start end (lambda (region) (vips--openai-chat model region))))
 
-(defun vips-chat-region-gpt-4 (start end)
+(defun vips-chat-region-gpt-4 ()
   "Call `vips-chat-region' with the gpt-4 model argument passed in."
-  (interactive "r")
-  (vips-chat-region start end "gpt-4"))
+  (interactive)
+  (let* ((region (vips-get-region-or-paragraph))
+         (start (car region))
+         (end (cadr region)))
+    (vips-chat-region start end "gpt-4")))
 
-(defun vips-chat-region-gpt-3.5-turbo (start end)
+(defun vips-chat-region-gpt-3.5-turbo ()
   "Call `vips-chat-region' with the gpt-3.5-turbo model argument passed in."
-  (interactive "r")
-  (vips-chat-region start end "gpt-3.5-turbo"))
+  (interactive)
+  (let* ((region (vips-get-region-or-paragraph))
+         (start (car region))
+         (end (cadr region)))
+    (vips-chat-region start end "gpt-3.5-turbo")))
 
-(defun vips-chat-region-select-model (start end)
+(defun vips-chat-region-select-model ()
   "Call `vips-chat-region' with a user-selected model."
-  (interactive "r")
-  (let* ((models '("gpt-4" "gpt-3.5-turbo" "gpt-3.5-turbo-16k"))
+  (interactive)
+  (let* ((region (vips-get-region-or-paragraph))
+         (start (car region))
+         (end (cadr region))
+         (models '("gpt-4" "gpt-3.5-turbo" "gpt-3.5-turbo-16k"))
          (selected-model (completing-read "Select a model: " models nil t)))
     (vips-chat-region start end selected-model)))
 
 (defun vips-process-region (start end process-fn)
   "Process the region or paragraph using PROCESS-FN."
-  (if (use-region-p)
-      (let* ((region (buffer-substring-no-properties start end))
-             (result (funcall process-fn region)))
-        (if result
-            (progn
-              (goto-char end)
-              (insert "" result "\n")
-              (push-mark start 'no-message)
-              (setq deactivate-mark nil)
-              (unless (pos-visible-in-window-p (point))
-                (recenter vips-recenter-position)))
-          (message "Empty result or not yet received")))
-    (mark-paragraph)
-    (let* ((region (buffer-substring-no-properties (region-beginning) (region-end)))
-           (result (funcall process-fn region)))
-      (if result
-          (progn
-            (goto-char (region-end))
-            (insert result "\n")
-            (push-mark (region-beginning) 'no-message)
-            (setq deactivate-mark nil)
-            (unless (pos-visible-in-window-p (point))
-              (recenter vips-recenter-position)))
-        (message "Empty result or not yet received")))))
-
-(defun vips-process-region (start end process-fn)
-  "Process the region or paragraph using PROCESS-FN."
-  (if (use-region-p)
-      (let* ((region (buffer-substring-no-properties start end))
-             (result (funcall process-fn region)))
-        (if result
-            (progn
-              (goto-char end)
-              (insert "" result "\n")
-              (push-mark start 'no-message)
-              (setq deactivate-mark nil)
-              (unless (pos-visible-in-window-p (point))
-                (recenter vips-recenter-position))
-              (message "Response inserted.")) ;; Display message after response is inserted
-          (message "Empty result or not yet received")))
-    (mark-paragraph)
-    (let* ((region (buffer-substring-no-properties (region-beginning) (region-end)))
-           (result (funcall process-fn region)))
-      (if result
-          (progn
-            (goto-char (region-end))
-            (insert result "\n")
-            (push-mark (region-beginning) 'no-message)
-            (setq deactivate-mark nil)
-            (unless (pos-visible-in-window-p (point))
-              (recenter vips-recenter-position))
-            (message "Response inserted.")) ;; Display message after response is inserted
-        (message "Empty result or not yet received")))))
+  (let* ((region (buffer-substring-no-properties start end))
+         (result (funcall process-fn region)))
+    (if result
+        (progn
+          (goto-char (max end (point))) ;; go to the end of the processed region
+          (insert "" result "\n")
+          (push-mark start 'no-message)
+          (setq deactivate-mark nil)
+          (unless (pos-visible-in-window-p (point))
+            (recenter vips-recenter-position)))
+      (message "Waiting for response..."))))
 
 (defun mark-and-run-vips-chat-region-gpt-4 ()
   "Mark the entire buffer and run 'vips-chat-region-gpt-4'."
   (interactive)
   (let* ((start (point-min))
          (end (point-max)))
-    (if (not (region-active-p)) ; check if a region is active
-        (push-mark start 'no-message)) ; if not, set mark at start position
-    (let* ((region (buffer-substring-no-properties start end))
-           (result (vips--openai-chat "gpt-4" region)))
-      (if result
-          (progn
-            (goto-char end)
-            (insert "" result "\n")
-            (setq deactivate-mark nil) ; keep selection active
-            (unless (pos-visible-in-window-p (point)) ; check if the end of the selection is visible
-              (recenter vips-recenter-position))) ; move view so that the end of the region is towards the bottom
-        (message "Empty result or not yet received")))))
+    (vips-process-region start end (lambda (region) (vips--openai-chat "gpt-4" region)))))
 
 (defun mark-and-run-vips-chat-region-gpt-4-to-current ()
-  "Mark the text from the start of the buffer to the the current position and run 'vips-chat-region-gpt-4'."
+  "Mark the text from the start of the buffer to the current position and run 'vips-chat-region-gpt-4'."
   (interactive)
   (let* ((start (point-min))
-         (end (point)))
-    (if (not (region-active-p)) ; check if a region is active
-        (push-mark start 'no-message)) ; if not, set mark at start position
-    (let* ((region (buffer-substring-no-properties start end))
-           (result (vips--openai-chat "gpt-4" region)))
-      (if result
-          (progn
-            (goto-char end)
-            (insert "" result "\n")
-            (setq deactivate-mark nil) ; keep selection active
-            (unless (pos-visible-in-window-p (point)) ; check if the end of the selection is visible
-              (recenter vips-recenter-position))) ; move view so that the end of the region is towards the bottom
-        (message "Empty result or not yet received")))))
+         (end (if (region-active-p)
+                  (region-end)
+                (point))))
+    (push-mark start)
+    (goto-char end)
+    (activate-mark)
+    (vips-process-region start end (lambda (region) (vips--openai-chat "gpt-4" region)))))
 
 (define-minor-mode vips-mode
   "Minor mode to use vips functions."
