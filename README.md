@@ -1,6 +1,6 @@
 # vips.el
 
-`vips.el` is a powerful Emacs interface for OpenAI's GPT API and DeepL's translation API. This tool allows you to leverage the capabilities of these APIs directly within your Emacs environment.
+`vips.el` is a simple but powerful Emacs interface for OpenAI's GPT API and DeepL's translation API. This tool allows you to leverage the capabilities of these APIs directly within your Emacs environment.
 
 ## Key Features
 
@@ -48,6 +48,10 @@ The `vips-languages` variable contains the list of language codes available for 
 ```
 
 This will add German ("DE") and French ("FR") to the list of available languages.
+
+## Alternatives
+
+`vips.el` is not the only Emacs client for ChatGPT. There are also: [GPTel](https://github.com/karthink/gptel), [chatgpt-shell](https://github.com/xenodium/chatgpt-shell), [org-ai](https://github.com/rksm/org-ai), [chatgpt-arcana](https://github.com/CarlQLange/chatgpt-arcana.el), [leafy-mode](https://github.com/MichaelBurge/leafy-mode), and [chat.el](https://github.com/iwahbe/chat.el).
 
 ## License
 
