@@ -32,14 +32,9 @@
 (defconst vips-recenter-position -2
   "Position to recenter the view after inserting the result.")
 
-;; OpenAI model settings
+;; OpenAI-related settings
 
-(defcustom vips-system-message "You are a helpful assistant"
-  "System message sent to OpenAI API."
-  :type 'string
-  :group 'vips)
-
-(defcustom vips-max-tokens 4000
+(defcustom vips-max-tokens 4096
   "The max-tokens paramater that vips.el sends to OpenAI API."
   :type 'integer
   :group 'vips)
@@ -64,8 +59,10 @@
   :type 'float
   :group 'vips)
 
-;; DeepL-related settings
+;; DeepL-related code
+
 (defcustom vips-languages '("DA" "EN")
+  ;; Add more languages here or, better yet, in your config.el
   "List of languages available for selection."
   :type '(repeat string)
   :group 'vips)
@@ -103,6 +100,104 @@
   (interactive "r")
   (vips-process-region start end 'vips--deepl-translate-string))
 
+; OpenAI-related code
+
+(defcustom vips-main-system-messages '("You are a helpful assistant."
+                                       "You are a great teacher.")
+  "List of system messages available for selection."
+  :type '(repeat string)
+  :group 'vips)
+
+(defcustom vips-addon-messages '("Use Markdown markup."
+                                 "Use LaTeX markup."
+                                 "Use Org Mode markup.")
+  "List of add-on messages available for selection."
+  :type '(repeat string)
+  :group 'vips)
+
+(defvar-local vips-selected-main-system-message ""
+  "Selected main system message.")
+
+(defvar-local vips-selected-addon-message ""
+  "Selected add-on message.")
+
+(defvar-local vips-selected-system-message ""
+  "Selected system message, including the add-on message.")
+
+(defun vips-clear-main-system-message ()
+  "Clear the selected main system message."
+  (interactive)
+  (setq vips-selected-main-system-message "")
+  (vips-combine-messages))
+
+(defun vips-clear-addon-message ()
+  "Clear the selected add-on message."
+  (interactive)
+  (setq vips-selected-addon-message "")
+  (vips-combine-messages))
+
+(defun vips-clear-both-messages ()
+  "Clear both the selected main system message and the selected add-on message."
+  (interactive)
+  (vips-clear-main-system-message)
+  (vips-clear-addon-message))
+
+(defun vips-clear-selected-message ()
+  "Prompt user to select which message to clear: the main system message, the add-on message, or both."
+  (interactive)
+  (let ((message-to-clear (completing-read "Clear which message? (main/addon/both): " '("main" "addon" "both"))))
+    (cond
+     ((string-equal message-to-clear "main") (vips-clear-main-system-message))
+     ((string-equal message-to-clear "addon") (vips-clear-addon-message))
+     ((string-equal message-to-clear "both") (vips-clear-both-messages))
+     (t (message "Invalid option")))))
+
+(defun vips-select-main-system-message ()
+  "Prompt user to select a main system message and set the global variable 'vips-selected-main-system-message' to the selected message."
+  (interactive)
+  (setq vips-selected-main-system-message (completing-read "Select main system message: " vips-main-system-messages))
+  (vips-combine-messages))
+
+(defun vips-select-addon-message ()
+  "Prompt user to select an add-on message and set the global variable 'vips-selected-addon-message' to the selected message."
+  (interactive)
+  (setq vips-selected-addon-message (completing-read "Select add-on message: " vips-addon-messages))
+  (vips-combine-messages))
+
+(defun vips-combine-messages ()
+  "Combine the selected main system message with the selected add-on message and store it in 'vips-selected-system-message'."
+  (interactive)
+  (setq vips-selected-system-message (concat vips-selected-main-system-message " " vips-selected-addon-message)))
+
+(defun vips-display-selected-messages ()
+  "Display the currently selected messages to the user in a temporary buffer."
+  (interactive)
+  ;; Capture the current values of the selected messages.
+  (let ((current-main-message vips-selected-main-system-message)
+        (current-addon-message vips-selected-addon-message)
+        (current-combined-message vips-selected-system-message)
+        (buffer-name "*VIPS Messages*"))
+    ;; Kill the buffer if it exists.
+    (when (get-buffer buffer-name)
+      (kill-buffer buffer-name))
+    ;; Create a new buffer and insert the captured messages.
+    (let ((buffer (get-buffer-create buffer-name)))
+      (with-current-buffer buffer
+        (erase-buffer)
+        (insert "Selected main system message:\n")
+        (insert current-main-message)
+        (insert "\n\nSelected add-on message:\n")
+        (insert current-addon-message)
+        (insert "\n\nCombined system message:\n")
+        (insert current-combined-message) ;; Insert the captured combined message.
+        (view-mode 1)
+        ;; Set up a custom quit function to kill the buffer when 'q' is pressed.
+        (local-set-key (kbd "q") (lambda ()
+                                    (interactive)
+                                    (kill-buffer buffer-name))))
+      ;; Display the buffer to the user.
+      (pop-to-buffer buffer))))
+
 (defun vips--openai-api-request (api-key model prompt)
   "Return prompt answer from OpenAI API. \n\n API-KEY is OpenAI API key. \n\n MODEL is the model string, e.g., \"gpt-4\". \n\n PROMPT is prompt string sent to the API."
   (let* ((auth-value (format "Bearer %s" api-key))
@@ -115,7 +210,7 @@
       vips-openai-api-url
       :type "POST"
       :data (json-encode `(("model" . ,model)
-                           ("messages" . ((("role" . "system") ("content" . ,vips-system-message))
+                           ("messages" . ((("role" . "system") ("content" . ,vips-selected-system-message))
                                          (("role" . "user") ("content" . ,prompt))))
                            ("max_tokens" . ,vips-max-tokens)
                            ("temperature" . ,vips-temperature)
@@ -171,13 +266,21 @@
          (end (cadr region)))
     (vips-chat-region start end "gpt-3.5-turbo")))
 
+(defun vips-chat-region-gpt-4-turbo ()
+  "Call `vips-chat-region' with the gpt-3.5-turbo model argument passed in."
+  (interactive)
+  (let* ((region (vips-get-region-or-paragraph))
+         (start (car region))
+         (end (cadr region)))
+    (vips-chat-region start end "gpt-4-1106-preview")))
+
 (defun vips-chat-region-select-model ()
   "Call `vips-chat-region' with a user-selected model."
   (interactive)
   (let* ((region (vips-get-region-or-paragraph))
          (start (car region))
          (end (cadr region))
-         (models '("gpt-4" "gpt-3.5-turbo" "gpt-3.5-turbo-16k"))
+         (models '("gpt-4-1106-preview" "gpt-4" "gpt-3.5-turbo" "gpt-3.5-turbo-16k"))
          (selected-model (completing-read "Select a model: " models nil t)))
     (vips-chat-region start end selected-model)))
 
@@ -195,13 +298,6 @@
             (recenter vips-recenter-position)))
       (message "Waiting for response..."))))
 
-(defun mark-and-run-vips-chat-region-gpt-4 ()
-  "Mark the entire buffer and run 'vips-chat-region-gpt-4'."
-  (interactive)
-  (let* ((start (point-min))
-         (end (point-max)))
-    (vips-process-region start end (lambda (region) (vips--openai-chat "gpt-4" region)))))
-
 (defun mark-and-run-vips-chat-region-gpt-4-to-current ()
   "Mark the text from the start of the buffer to the current position and run 'vips-chat-region-gpt-4'."
   (interactive)
@@ -214,16 +310,53 @@
     (activate-mark)
     (vips-process-region start end (lambda (region) (vips--openai-chat "gpt-4" region)))))
 
+(defun mark-and-run-vips-chat-region-gpt-4 ()
+  "Run 'vips-chat-region-gpt-4' on the entire buffer. If no mark has been set, set and deactivate one as a workaround."
+  (interactive)
+  (when (not (mark))
+    ;; If no mark has been set, set one at the current point as a workaround (otherwise Emacs will complain if no mark was ever set in the buffer).
+    (push-mark (point))
+    ;; Deactivate the mark immediately so it doesn't affect subsequent commands.
+    (deactivate-mark))
+  (let ((start (point-min))
+        (end (point-max)))
+    (vips-process-region start end (lambda (region) (vips--openai-chat "gpt-4" region)))))
+
+(defun mark-and-run-vips-chat-region-gpt-4-turbo-to-current ()
+  "Mark the text from the start of the buffer to the current position and run 'vips-chat-region-gpt-4-turbo'."
+  (interactive)
+  (let* ((start (point-min))
+         (end (if (region-active-p)
+                  (region-end)
+                (point))))
+    (push-mark start)
+    (goto-char end)
+    (activate-mark)
+    (vips-process-region start end (lambda (region) (vips--openai-chat "gpt-4-1106-preview" region)))))
+
+(defun mark-and-run-vips-chat-region-gpt-4-turbo ()
+  "Run 'vips-chat-region-gpt-4-turbo' on the entire buffer. If no mark has been set, set and deactivate one as a workaround."
+  (interactive)
+  (when (not (mark))
+    ;; If no mark has been set, set one at the current point as a workaround (otherwise Emacs will complain if no mark was ever set in the buffer).
+    (push-mark (point))
+    ;; Deactivate the mark immediately so it doesn't affect subsequent commands.
+    (deactivate-mark))
+  (let ((start (point-min))
+        (end (point-max)))
+    (vips-process-region start end (lambda (region) (vips--openai-chat "gpt-4-1106-preview" region)))))
+
 (define-minor-mode vips-mode
   "Minor mode to use vips functions."
   :lighter " Vips"
   :keymap (let ((map (make-sparse-keymap)))
             (define-key map (kbd "C-c <left>") 'vips-chat-region-gpt-4)
-            (define-key map (kbd "C-c <right>") 'vips-chat-region-gpt-3.5-turbo)
+            (define-key map (kbd "C-c <right>") 'vips-chat-region-gpt-4-turbo)
             (define-key map (kbd "C-c <down>") 'vips-chat-region-select-model)
-            (define-key map (kbd "C-c C-a C-c") 'mark-and-run-vips-chat-region-gpt-4-to-current)
-            (define-key map (kbd "C-c C-a C-v") 'mark-and-run-vips-chat-region-gpt-4)
+            (define-key map (kbd "C-c C-a C-c") 'mark-and-run-vips-chat-region-gpt-4-turbo-to-current)
+            (define-key map (kbd "C-c C-a C-v") 'mark-and-run-vips-chat-region-gpt-4-turbo)
             (define-key map (kbd "C-c SPC") 'vips-translate)
+            (define-key map (kbd "C-c C-d C-s") 'vips-display-selected-messages)
             map))
 
 (provide 'vips)
