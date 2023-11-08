@@ -30,6 +30,7 @@ You can send text to OpenAI's models and receive AI-generated responses. Even wi
 - `C-c <down>`: Choose a specific model and send selected text to it.
 - `C-c C-a C-c`: Mark text from the start of the buffer to the current position and run GPT-4 Turbo.
 - `C-c C-a C-v`: Run GPT-4 Turbo on the entire buffer.
+- `C-c C-d C-s`: Display currently selected system messages.
 
 ### Customizing AI Responses with System Messages
 
@@ -49,8 +50,7 @@ For more tailored interactions, you can define system messages that provide cont
 
 Translate text directly within Emacs using DeepL's powerful translation API.
 
-- Use `M-x vips-select-language` to set the target language for translation.
-- `C-c SPC`: Translate the selected text using DeepL and append the translation.
+- `C-c SPC`: Select output language, translate the selected text using DeepL, and append the translation.
 
 ### Configuration
 
