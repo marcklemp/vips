@@ -4,7 +4,7 @@
 
 ## Key Features
 
-- Work directly with OpenAI's GPT-4 and GPT-3.5-turbo models in Emacs.
+- Work directly with OpenAI's LLM models, such as GPT-4 and GPT-4 Turbo, in Emacs.
 - Customize parameters for OpenAI's API, including max tokens, temperature, top-p, frequency penalty, and presence penalty to fine-tune the output.
 - Translate text seamlessly using the DeepL API.
 - Choose your target language for translation.
@@ -17,16 +17,46 @@
 
 ## How to Use
 
-Activate `vips-mode` in your current buffer by executing `M-x vips-mode`.
+Activate `vips-mode` in your Emacs buffer by executing `M-x vips-mode`.
 
-Once `vips-mode` is enabled, you can use the following shortcuts:
+Once `vips-mode` is active, you can easily interact with OpenAI's GPT models and DeepL's translation API to enhance your productivity within Emacs.
 
-- `C-c <left>`: Send selected region or paragraph to OpenAI's GPT-4 model and append the result at the end of the region.
-- `C-c <right>`: Send selected region or paragraph to OpenAI's GPT-3.5-turbo model and append the result at the end of the region.
-- `C-c <down>`: Send selected region or paragraph to a user-selected OpenAI model and append the result at the end of the region.
-- `C-c C-a C-v`: Send entire buffer to OpenAI's GPT-4 model and append the result at the end of the buffer.
-- `C-c C-a C-c`: Send region defined from the top of the buffer to the current point to OpenAI's GPT-4 model and append the result at the end of the region.
-- `C-c SPC`: Select output language and translate selected region or paragraph using DeepL API and append the result at the end of the region.
+### Interacting with OpenAI's GPT Models
+
+You can send text to OpenAI's models and receive AI-generated responses. Even without setting system messages, the GPT models will operate effectively in a standard manner.
+
+- `C-c <left>`: Send selected text to GPT-4 and insert the response.
+- `C-c <right>`: Send selected text to GPT-4 Turbo and insert the response.
+- `C-c <down>`: Choose a specific model and send selected text to it.
+- `C-c C-a C-c`: Mark text from the start of the buffer to the current position and run GPT-4 Turbo.
+- `C-c C-a C-v`: Run GPT-4 Turbo on the entire buffer.
+
+### Customizing AI Responses with System Messages
+
+For more tailored interactions, you can define system messages that provide context or instructions to the AI model. These messages are divided into two categories: main system messages and add-on messages.
+
+- **Main System Messages**: Set general instructions or roles for the AI, like "You are a helpful assistant."
+- **Add-On Messages**: Specify additional guidelines, such as "Use Markdown markup."
+
+#### Managing System Messages
+
+- Use `M-x vips-select-main-system-message` and `M-x vips-select-addon-message` to choose main and add-on messages respectively.
+- The selected messages are combined automatically and sent with your text to the AI.
+- Clear selected messages with `M-x vips-clear-selected-message` if you wish to reset the AI's context.
+- View the current combined message with `M-x vips-display-selected-messages`.
+
+### Translating Text with DeepL
+
+Translate text directly within Emacs using DeepL's powerful translation API.
+
+- Use `M-x vips-select-language` to set the target language for translation.
+- `C-c SPC`: Translate the selected text using DeepL and append the translation.
+
+### Configuration
+
+Before using `vips-mode`, configure your API keys for OpenAI and DeepL in your Emacs settings.
+
+With `vips-mode`, you have the flexibility to use GPT models in their standard configuration or customize their responses with system messages. This allows for a personalized experience whether you're drafting documents, coding, or communicating in multiple languages.
 
 ## Important Notes
 
