@@ -1,10 +1,12 @@
 # vips.el
 
-`vips.el` is a simple but powerful Emacs interface for OpenAI's GPT API and DeepL's translation API. This tool allows you to leverage the capabilities of these APIs directly within your Emacs environment.
+`vips.el` is a simple but powerful Emacs interface for OpenAI's GPT API, text-to-speech API, and DeepL's translation API. This tool allows you to leverage the capabilities of these APIs directly within your Emacs environment.
 
 ## Key Features
 
 - Work directly with OpenAI's LLM models, such as GPT-4 and GPT-4 Turbo, in Emacs.
+- Directly interact with OpenAI's text-to-speech model, enabling the output to be played within Emacs (if your version supports it) or through your operating system's default player.
+- The synthesized speech can be saved as an mp3 file for future reference and use.
 - Customize parameters for OpenAI's API, including max tokens, temperature, top-p, frequency penalty, and presence penalty to fine-tune the output.
 - Translate text seamlessly using the DeepL API.
 - Choose your target language for translation.
@@ -30,6 +32,7 @@ You can send text to OpenAI's models and receive AI-generated responses. Even wi
 - `C-c <down>`: Choose a specific model and send selected text to it.
 - `C-c C-a C-c`: Mark text from the start of the buffer to the current position and run GPT-4 Turbo.
 - `C-c C-a C-v`: Run GPT-4 Turbo on the entire buffer.
+- `C-c .`: Play the selected text in your operating system's default player.
 - `C-c C-d C-s`: Display currently selected system messages.
 
 ### Customizing AI Responses with System Messages
@@ -78,6 +81,74 @@ The `vips-languages` variable contains the list of language codes available for 
 ```
 
 This will add German ("DE") and French ("FR") to the list of available languages.
+
+# Interactive Functions in `vips.el`
+
+The `vips.el` package provides a variety of interactive functions to interact with OpenAI's GPT API and DeepL's translation API directly from Emacs. While some functions are bound to keybindings for quick access, others are available for invocation through `M-x` or by binding them to your own custom keybindings. Below is a list of interactive functions not included in the default keybindings:
+
+## OpenAI GPT Functions
+
+### `vips-select-voice`
+Prompts the user to select a voice for text-to-speech functionality and sets the global variable `vips-selected-voice` to the selected voice.
+
+### `vips-select-language`
+Prompts the user to select a target language for translation and sets the global variable `vips-selected-language` to the selected language code.
+
+### `vips-clear-main-system-message`
+Clears the selected main system message.
+
+### `vips-clear-addon-message`
+Clears the selected add-on message.
+
+### `vips-clear-both-messages`
+Clears both the selected main system message and the selected add-on message.
+
+### `vips-clear-selected-message`
+Prompts the user to select which message to clear: the main system message, the add-on message, or both.
+
+### `vips-select-main-system-message`
+Prompts the user to select a main system message and sets the global variable `vips-selected-main-system-message` to the selected message.
+
+### `vips-select-addon-message`
+Prompts the user to select an add-on message and sets the global variable `vips-selected-addon-message` to the selected message.
+
+### `vips-combine-messages`
+Combines the selected main system message with the selected add-on message and stores it in `vips-selected-system-message`.
+
+### `vips-display-selected-messages`
+Displays the currently selected messages to the user in a temporary buffer.
+
+## DeepL Translation Functions
+
+### `vips--deepl-translate-string`
+Translates a given string using DeepL's translation API and returns the translated text.
+
+## Text-to-Speech Functions
+
+### `vips-create-and-play-speech`
+Generates speech from selected text and plays it using an audio player.
+
+### `vips-create-and-save-speech`
+Generates speech from selected text and saves it to a specified location.
+
+### `vips-create-and-play-speech-with-os`
+Generates speech from selected text, saves it to a temporary file, and plays it using the operating system's default media player.
+
+## Miscellaneous Functions
+
+### `mark-and-run-vips-chat-region-gpt-4-to-current`
+Marks the text from the start of the buffer to the current position and runs `vips-chat-region-gpt-4`.
+
+### `mark-and-run-vips-chat-region-gpt-4`
+Runs `vips-chat-region-gpt-4` on the entire buffer.
+
+### `mark-and-run-vips-chat-region-gpt-4-turbo-to-current`
+Marks the text from the start of the buffer to the current position and runs `vips-chat-region-gpt-4-turbo`.
+
+### `mark-and-run-vips-chat-region-gpt-4-turbo`
+Runs `vips-chat-region-gpt-4-turbo` on the entire buffer.
+
+These interactive functions provide additional flexibility and control over how you interact with AI services within Emacs. You can bind these functions to your preferred key combinations or invoke them directly as needed.
 
 ## Alternatives
 

@@ -59,6 +59,21 @@
   :type 'float
   :group 'vips)
 
+(defcustom vips-selected-voice "alloy"
+  "Selected voice for text-to-speech."
+  :type '(choice (const "alloy")
+                 (const "echo")
+                 (const "fable")
+                 (const "onyx")
+                 (const "nova")
+                 (const "shimmer"))
+  :group 'vips)
+
+(defun vips-select-voice ()
+  "Prompt user to select a voice and set the global variable 'vips-selected-voice' to the selected voice."
+  (interactive)
+  (setq vips-selected-voice (completing-read "Select voice: " '("alloy" "echo" "fable" "onyx" "nova" "shimmer"))))
+
 ;; DeepL-related code
 
 (defcustom vips-languages '("DA" "EN")
@@ -101,6 +116,7 @@
   (vips-process-region start end 'vips--deepl-translate-string))
 
 ; OpenAI-related code
+; GPT
 
 (defcustom vips-main-system-messages '("You are a helpful assistant."
                                        "You are a great teacher.")
@@ -346,6 +362,101 @@
         (end (point-max)))
     (vips-process-region start end (lambda (region) (vips--openai-chat "gpt-4-1106-preview" region)))))
 
+; TTS
+
+(defun vips--openai-speech-request (api-key model input voice &optional response-format speed output-file action)
+  "Return audio file content from OpenAI API and save it to OUTPUT-FILE or play it.
+API-KEY is OpenAI API key.
+MODEL is the TTS model string, e.g., \"tts-1\".
+INPUT is the text string sent to the API.
+VOICE is the voice used for generating the audio.
+RESPONSE-FORMAT is the format of the audio file, defaults to 'mp3'.
+SPEED is the speed of the generated audio.
+ACTION is either 'save or 'play, determining what to do with the response."
+  (let* ((auth-value (format "Bearer %s" api-key))
+         (url "https://api.openai.com/v1/audio/speech")
+         (data (json-encode `(("model" . ,model)
+                              ("input" . ,input)
+                              ("voice" . ,voice)
+                              ,@(when response-format `(("response_format" . ,response-format)))
+                              ,@(when speed `(("speed" . ,speed))))))
+         (response-buffer (generate-new-buffer "*vips-speech-response*"))
+         (response (request
+                     url
+                     :type "POST"
+                     :data data
+                     :headers `(("Authorization" . ,auth-value) ("Content-Type" . "application/json"))
+                     :parser 'buffer-string
+                     :success (cl-function
+                               (lambda (&key data &allow-other-keys)
+                                 (with-current-buffer response-buffer
+                                   (insert data))
+                                 (when (eq action 'save)
+                                   (let ((coding-system-for-write 'binary)) ;; Use binary encoding for writing
+                                     (with-temp-file output-file
+                                       (insert-buffer-substring response-buffer))
+                                     (message "Speech saved to %s" output-file)))))
+                     :error (cl-function
+                             (lambda (&key error-thrown &allow-other-keys)
+                               (message "Error: %S" error-thrown))))))
+    response))
+
+(defun vips-create-and-play-speech (start end)
+  "Generate speech from selected text and play it.
+START and END define the region of text to be synthesized."
+  (interactive "r")
+  (unless (use-region-p)
+    (error "No region selected"))
+  (let* ((model "tts-1") ;; You can prompt for this or set a default.
+         (input (buffer-substring-no-properties start end))
+         (voice vips-selected-voice)
+         (output-file (make-temp-file "emacs_speech_" nil ".mp3"))
+         (response (vips--openai-speech-request openai-api-key model input voice nil nil output-file 'save)))
+    ;; Wait for the request to finish
+    (while (not (request-response-done-p response)) (sleep-for 0.1))
+    ;; Play the sound file
+    (play-sound-file output-file)))
+
+(defun vips-create-and-save-speech (start end)
+  "Generate speech from selected text and save it to a specified location.
+START and END define the region of text to be synthesized."
+  (interactive "r")
+  (unless (use-region-p)
+    (error "No region selected"))
+  (let* ((model "tts-1") ;; You can prompt for this or set a default.
+         (input (buffer-substring-no-properties start end))
+         (voice vips-selected-voice)
+         (output-file (read-file-name "Save speech as: " nil nil nil "speech.mp3"))
+         (response (vips--openai-speech-request openai-api-key model input voice nil nil output-file 'save)))
+    ;; Wait for the request to finish
+    (while (not (request-response-done-p response)) (sleep-for 0.1))
+    ;; Notify user that the file has been saved
+    (message "Speech saved to %s" output-file)))
+
+(defun vips-create-and-play-speech-with-os (start end)
+  "Generate speech from selected text, save it to a temporary file, and play it using the OS's default media player.
+START and END define the region of text to be synthesized."
+  (interactive "r")
+  (unless (use-region-p)
+    (error "No region selected"))
+  (let* ((model "tts-1") ;; You can prompt for this or set a default.
+         (input (buffer-substring-no-properties start end))
+         (voice vips-selected-voice)
+         (output-file (make-temp-file "emacs_speech_" nil ".mp3"))
+         (response (vips--openai-speech-request openai-api-key model input voice nil nil output-file 'save)))
+    ;; Wait for the request to finish
+    (while (not (request-response-done-p response)) (sleep-for 0.1))
+    ;; Play the sound file using the OS's default media player
+    (cond
+     ((eq system-type 'darwin) ;; macOS
+      (start-process "vips-mac-play" nil "sh" "-c" (concat "open " output-file " && sleep 1 && open -a Emacs")))
+     ((eq system-type 'gnu/linux) ;; Linux
+      (start-process "vips-linux-play" nil "xdg-open" output-file))
+     ((eq system-type 'windows-nt) ;; Windows
+      (start-process "vips-windows-play" nil "cmd.exe" "/c" "start" "" output-file))
+     (t
+      (message "OS not supported for audio playback")))))
+
 (define-minor-mode vips-mode
   "Minor mode to use vips functions."
   :lighter " Vips"
@@ -357,6 +468,7 @@
             (define-key map (kbd "C-c C-a C-v") 'mark-and-run-vips-chat-region-gpt-4-turbo)
             (define-key map (kbd "C-c SPC") 'vips-translate)
             (define-key map (kbd "C-c C-d C-s") 'vips-display-selected-messages)
+            (define-key map (kbd "C-c .") 'vips-create-and-play-speech-with-os)
             map))
 
 (provide 'vips)
