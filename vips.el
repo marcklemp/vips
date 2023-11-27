@@ -1,7 +1,7 @@
 ;;; vips.el --- An Emacs front end for OpenAI's GPT API and DeepL's translation API  -*- lexical-binding: t; -*-
 
 ;; Copyright (C) 2023 Marc Klemp
-;; Keywords: GPT, DeepL
+;; Keywords: GPT, DeepL, TTS
 
 ;; POST-related code adapted and extended from `aide.el` by Junji Zhi.
 
@@ -183,10 +183,24 @@
 (defun vips-combine-messages ()
   "Combine the selected main system message with the selected add-on message and store it in 'vips-selected-system-message'."
   (interactive)
-  (setq vips-selected-system-message (concat vips-selected-main-system-message " " vips-selected-addon-message)))
+  (setq vips-selected-system-message (concat vips-selected-main-system-message "\n\n" vips-selected-addon-message)))
+
+(defun vips-update-system-message-in-all-buffers ()
+  "Update the system message in all buffers."
+  (interactive)
+  ;; Capture the current values of the selected messages.
+  (let ((current-main-message vips-selected-main-system-message)
+        (current-addon-message vips-selected-addon-message)
+        (current-combined-message vips-selected-system-message))
+    ;; Iterate over all buffers and set the selected messages.
+    (dolist (buffer (buffer-list))
+      (with-current-buffer buffer
+        (setq vips-selected-main-system-message current-main-message
+              vips-selected-addon-message current-addon-message
+              vips-selected-system-message current-combined-message)))))
 
 (defun vips-display-selected-messages ()
-  "Display the currently selected messages to the user in a temporary buffer."
+  "Display the currently selected messages to the user in a temporary buffer and frame."
   (interactive)
   ;; Capture the current values of the selected messages.
   (let ((current-main-message vips-selected-main-system-message)
@@ -200,19 +214,21 @@
     (let ((buffer (get-buffer-create buffer-name)))
       (with-current-buffer buffer
         (erase-buffer)
-        (insert "Selected main system message:\n")
-        (insert current-main-message)
-        (insert "\n\nSelected add-on message:\n")
-        (insert current-addon-message)
-        (insert "\n\nCombined system message:\n")
-        (insert current-combined-message) ;; Insert the captured combined message.
+        (insert "Selected main system message:\n" current-main-message "\n\n")
+        (insert "Selected add-on message:\n" current-addon-message "\n\n")
+        (insert "Combined system message:\n" current-combined-message "\n")
         (view-mode 1)
-        ;; Set up a custom quit function to kill the buffer when 'q' is pressed.
+        ;; Set up a custom quit function to delete the frame when 'q' is pressed.
         (local-set-key (kbd "q") (lambda ()
                                     (interactive)
-                                    (kill-buffer buffer-name))))
-      ;; Display the buffer to the user.
-      (pop-to-buffer buffer))))
+                                    (delete-frame))))
+      ;; Display the buffer in a new frame.
+      (let ((display-buffer-alist
+             `((,(regexp-quote buffer-name)
+                (display-buffer-pop-up-frame)
+                (inhibit-same-window . t)
+                (reusable-frames . nil)))))
+        (pop-to-buffer buffer)))))
 
 (defun vips--openai-api-request (api-key model prompt)
   "Return prompt answer from OpenAI API. \n\n API-KEY is OpenAI API key. \n\n MODEL is the model string, e.g., \"gpt-4\". \n\n PROMPT is prompt string sent to the API."
@@ -395,7 +411,9 @@ ACTION is either 'save or 'play, determining what to do with the response."
                                    (let ((coding-system-for-write 'binary)) ;; Use binary encoding for writing
                                      (with-temp-file output-file
                                        (insert-buffer-substring response-buffer))
-                                     (message "Speech saved to %s" output-file)))))
+                                     (message "Speech saved to %s" output-file)))
+                                 ;; Kill the response buffer after saving or playing
+                                 (kill-buffer response-buffer)))
                      :error (cl-function
                              (lambda (&key error-thrown &allow-other-keys)
                                (message "Error: %S" error-thrown))))))

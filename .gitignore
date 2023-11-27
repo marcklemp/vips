@@ -1,3 +1,6 @@
 .*
 !.gitignore
 !.gitattributes
+
+# Ignore file used for development
+*.org

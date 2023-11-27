@@ -27,15 +27,15 @@ Once `vips-mode` is active, you can easily interact with OpenAI's GPT models and
 
 You can send text to OpenAI's models and receive AI-generated responses. Even without setting system messages, the GPT models will operate effectively in a standard manner.
 
+#### GPT Keybindings
+
 - `C-c <left>`: Send selected text to GPT-4 and insert the response.
 - `C-c <right>`: Send selected text to GPT-4 Turbo and insert the response.
 - `C-c <down>`: Choose a specific model and send selected text to it.
 - `C-c C-a C-c`: Mark text from the start of the buffer to the current position and run GPT-4 Turbo.
 - `C-c C-a C-v`: Run GPT-4 Turbo on the entire buffer.
-- `C-c .`: Play the selected text in your operating system's default player.
-- `C-c C-d C-s`: Display currently selected system messages.
 
-### Customizing AI Responses with System Messages
+#### Customizing AI Responses with System Messages
 
 For more tailored interactions, you can define system messages that provide context or instructions to the AI model. These messages are divided into two categories: main system messages and add-on messages.
 
@@ -48,6 +48,14 @@ For more tailored interactions, you can define system messages that provide cont
 - The selected messages are combined automatically and sent with your text to the AI.
 - Clear selected messages with `M-x vips-clear-selected-message` if you wish to reset the AI's context.
 - View the current combined message with `M-x vips-display-selected-messages`.
+
+### Using OpenAI's Text-to-Speech (TTS)
+
+Interact with OpenAI's text-to-speech model, enabling the output to be played within Emacs (if your version supports it) or through your operating system's default player.
+
+#### TTS Keybindings
+
+- `C-c .`: Play the selected text in your operating system's default player.
 
 ### Translating Text with DeepL
 
@@ -80,7 +88,7 @@ Additional functions are available for invocation through `M-x` or by binding th
 
 #### Speech Synthesis
 - `vips-create-and-play-speech`: Generate speech from the selected text region and play it using Emacs' built-in audio playback capabilities.
-- `vips-create-and-save-speech`: Generate speech from the selected text region and save it to a specified location on the user's filesystem.
+- `vips-create-and-save-speech`: Generate speech from the selected text region and save it as an MP3 file to a specified location.
 
 #### Speech Synthesis with OS Integration
 - `vips-create-and-play-speech-with-os`: Generate speech from the selected text region, save it to a temporary file, and play it using the operating system's default media player.
@@ -89,28 +97,43 @@ These functions enhance your interaction with AI services by providing additiona
 
 ### Configuration
 
-Before using `vips-mode`, configure your API keys for OpenAI and DeepL in your Emacs settings.
+#### API Keys
 
 To use this tool, you must have valid API keys for GPT and/or DeepL.
 
-Add the following code to your config.el file:
+Set your API keys in your Emacs configuration:
 
 ```emacs-lisp
-(setq openai-api-key "<your-openai-key-here>")
-(setq deepl-api-key "<your-deepl-key-here>")
+(setq openai-api-key "your-openai-api-key")
+(setq deepl-api-key "your-deepl-api-key")
 ```
 
 Replace <your-openai-key-here> and <your-deepl-key-here> with your actual API keys.
 
+#### Languages
+
 The `vips-languages` variable contains the list of language codes available for the translation function, initially set to include Danish ("DA") and English ("EN"). To modify this list, you can add a `setq` form to your Emacs configuration file (.emacs or init.el), like so:
 
 ```emacs-lisp
-(setq vips-languages '("DA" "EN" "DE" "FR"))
+(setq vips-languages '("EN" "DE" "FR" "ES")) ; Add desired language codes
 ```
 
-This will add German ("DE") and French ("FR") to the list of available languages.
+#### System messages
 
-With `vips-mode`, you have the flexibility to use GPT models in their standard configuration or customize their responses with system messages. This allows for a personalized experience whether you're drafting documents, coding, or communicating in multiple languages.
+Define system messages in your `config.el`:
+
+```emacs-lisp
+;; Set main system message
+(setq vips-selected-main-system-message "You are a helpful assistant.")
+
+;; Set add-on message
+(setq vips-selected-addon-message "Use Org Mode markup.")
+
+;; Combine messages
+(vips-combine-messages)
+
+;; Update messages in all buffers
+(vips-update-system-message-in-all-buffers)
 
 ## Alternatives
 
@@ -122,4 +145,4 @@ This program is distributed as free software. You can redistribute it and/or mod
 
 ## Acknowledgements
 
-This project was inspired by `aide.el` by Junji Zhi. The POST-related code was adapted and extended from the original code in `aide.el`. We thank Junji Zhi for their contribution to the open source community. `aide.el` is licensed under the GPL license.
+This project was inspired by `aide.el` by Junji Zhi. The POST-related code was adapted and extended from the original code in `aide.el`. I thank Junji Zhi for their contribution to the open source community. `aide.el` is licensed under the GPL license.
