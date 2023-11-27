@@ -134,6 +134,7 @@ Define system messages in your `config.el`:
 
 ;; Update messages in all buffers
 (vips-update-system-message-in-all-buffers)
+```
 
 ## Alternatives
 
