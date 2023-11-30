@@ -29,6 +29,8 @@
 
 (defconst vips-openai-api-url "https://api.openai.com/v1/chat/completions")
 (defconst vips-deepl-api-url "https://api.deepl.com/v2/translate")
+(defconst vips-lmstudio-api-url "http://localhost:1234/v1/chat/completions")
+
 (defconst vips-recenter-position -2
   "Position to recenter the view after inserting the result.")
 
@@ -131,13 +133,13 @@
   :type '(repeat string)
   :group 'vips)
 
-(defvar-local vips-selected-main-system-message ""
+(defvar-local vips-selected-main-system-message "You are a helpful assistant."
   "Selected main system message.")
 
 (defvar-local vips-selected-addon-message ""
   "Selected add-on message.")
 
-(defvar-local vips-selected-system-message ""
+(defvar-local vips-selected-system-message "You are a helpful assistant."
   "Selected system message, including the add-on message.")
 
 (defun vips-clear-main-system-message ()
@@ -230,16 +232,21 @@
                 (reusable-frames . nil)))))
         (pop-to-buffer buffer)))))
 
-(defun vips--openai-api-request (api-key model prompt)
-  "Return prompt answer from OpenAI API. \n\n API-KEY is OpenAI API key. \n\n MODEL is the model string, e.g., \"gpt-4\". \n\n PROMPT is prompt string sent to the API."
-  (let* ((auth-value (format "Bearer %s" api-key))
-         (insertion-marker (make-marker)) ;; create a new marker
-         (prompt-end (+ (region-beginning) (length prompt))) ;; calculate the end of the prompt
-         (current-buffer (current-buffer))) ;; capture the current buffer
-    (set-marker insertion-marker prompt-end current-buffer) ;; set the marker at the end of the prompt in the current buffer
-    (message "Request sent, waiting for response.") ;; display message after request is sent
+(defun vips--openai-api-request (api-key model prompt &optional api-url)
+  "Return prompt answer from OpenAI API or a local inference server.
+API-KEY is OpenAI API key or an empty string for local server.
+MODEL is the model string, e.g., \"gpt-4\".
+PROMPT is prompt string sent to the API.
+Optional API-URL is the URL of the API; defaults to OpenAI's URL."
+  (let* ((api-url (or api-url vips-openai-api-url)) ; Use provided api-url or default if nil
+         (auth-value (if (string-empty-p api-key) "" (format "Bearer %s" api-key)))
+         (insertion-marker (make-marker))
+         (prompt-end (+ (region-beginning) (length prompt)))
+         (current-buffer (current-buffer)))
+    (set-marker insertion-marker prompt-end current-buffer)
+    (message "Request sent, waiting for response.")
     (request
-      vips-openai-api-url
+      api-url
       :type "POST"
       :data (json-encode `(("model" . ,model)
                            ("messages" . ((("role" . "system") ("content" . ,vips-selected-system-message))
@@ -250,21 +257,21 @@
                            ("presence_penalty" . ,vips-presence-penalty)
                            ("top_p" . ,vips-top-p)))
       :headers `(("Authorization" . ,auth-value) ("Content-Type" . "application/json"))
-      :sync nil ;; make the request asynchronous
+      :sync nil
       :parser 'json-read
       :success (cl-function
                 (lambda (&key data &allow-other-keys)
-                  (with-current-buffer current-buffer ;; switch to the captured buffer
-                    (goto-char insertion-marker) ;; go to the position of the marker
+                  (with-current-buffer current-buffer
+                    (goto-char insertion-marker)
                     (insert (concat "\n" (alist-get 'content (alist-get 'message (elt (alist-get 'choices data) 0))))))
-                  (message "Response inserted."))) ;; display message after response is inserted
+                  (message "Response inserted.")))
       :error (cl-function
               (lambda (&key error-thrown &allow-other-keys)
                 (message "Error: %S" error-thrown))))
-  nil)) ;; return nil explicitly
+    nil))
 
-(defun vips--openai-chat (model prompt)
-  (vips--openai-api-request openai-api-key model prompt))
+(defun vips--openai-chat (model prompt &optional api-url)
+  (vips--openai-api-request openai-api-key model prompt api-url))
 
 (defun vips-get-region-or-paragraph ()
   "Return the start and end of the selected region or the current paragraph."
@@ -277,10 +284,10 @@
             (forward-paragraph)
             (point)))))
 
-(defun vips-chat-region (start end model)
+(defun vips-chat-region (start end model &optional api-url)
   "Send region or paragraph to OpenAI and insert result to end of region. \n\n START and END are selected region boundaries."
   (interactive "r")
-  (vips-process-region start end (lambda (region) (vips--openai-chat model region))))
+  (vips-process-region start end (lambda (region) (vips--openai-chat model region api-url))))
 
 (defun vips-chat-region-gpt-4 ()
   "Call `vips-chat-region' with the gpt-4 model argument passed in."
@@ -289,6 +296,14 @@
          (start (car region))
          (end (cadr region)))
     (vips-chat-region start end "gpt-4")))
+
+(defun vips-chat-region-lmstudio-local-model ()
+  "Call `vips-chat-region' using the vips-lmstudio-api-url."
+  (interactive)
+  (let* ((region (vips-get-region-or-paragraph))
+         (start (car region))
+         (end (cadr region)))
+    (vips-chat-region start end "local-model" vips-lmstudio-api-url))) ; Note: As of 30 November, 2023, LM Studio does not utilize the "model" argument and the "local-model" might as well be blank at this time. Please refer to the latest documentation for updates.
 
 (defun vips-chat-region-gpt-3.5-turbo ()
   "Call `vips-chat-region' with the gpt-3.5-turbo model argument passed in."
@@ -307,7 +322,7 @@
     (vips-chat-region start end "gpt-4-1106-preview")))
 
 (defun vips-chat-region-select-model ()
-  "Call `vips-chat-region' with a user-selected model."
+  "Call `vips-chat-region' with a user-selected OpenAI model."
   (interactive)
   (let* ((region (vips-get-region-or-paragraph))
          (start (car region))
@@ -377,6 +392,30 @@
   (let ((start (point-min))
         (end (point-max)))
     (vips-process-region start end (lambda (region) (vips--openai-chat "gpt-4-1106-preview" region)))))
+
+(defun mark-and-run-vips-chat-region-lmstudio-local-model-to-current ()
+  "Mark the text from the start of the buffer to the current position and run 'vips-chat-region-lmstudio-local-model'."
+  (interactive)
+  (let* ((start (point-min))
+         (end (if (region-active-p)
+                  (region-end)
+                (point))))
+    (push-mark start)
+    (goto-char end)
+    (activate-mark)
+    (vips-process-region start end (lambda (region) (vips--openai-chat "local-model" region vips-lmstudio-api-url)))))
+
+(defun mark-and-run-vips-chat-region-lmstudio-local-model ()
+  "Run 'vips-chat-region-lmstudio-local-model' on the entire buffer. If no mark has been set, set and deactivate one as a workaround."
+  (interactive)
+  (when (not (mark))
+    ;; If no mark has been set, set one at the current point as a workaround (otherwise Emacs will complain if no mark was ever set in the buffer).
+    (push-mark (point))
+    ;; Deactivate the mark immediately so it doesn't affect subsequent commands.
+    (deactivate-mark))
+  (let ((start (point-min))
+        (end (point-max)))
+    (vips-process-region start end (lambda (region) (vips--openai-chat "local-model" region vips-lmstudio-api-url)))))
 
 ; TTS
 
@@ -484,6 +523,9 @@ START and END define the region of text to be synthesized."
             (define-key map (kbd "C-c <down>") 'vips-chat-region-select-model)
             (define-key map (kbd "C-c C-a C-c") 'mark-and-run-vips-chat-region-gpt-4-turbo-to-current)
             (define-key map (kbd "C-c C-a C-v") 'mark-and-run-vips-chat-region-gpt-4-turbo)
+            (define-key map (kbd "C-c l") 'vips-chat-region-lmstudio-local-model)
+            (define-key map (kbd "C-c C-l C-c") 'mark-and-run-vips-chat-region-lmstudio-local-model-to-current)
+            (define-key map (kbd "C-c C-l C-v") 'mark-and-run-vips-chat-region-lmstudio-local-model)
             (define-key map (kbd "C-c SPC") 'vips-translate)
             (define-key map (kbd "C-c C-d C-s") 'vips-display-selected-messages)
             (define-key map (kbd "C-c .") 'vips-create-and-play-speech-with-os)

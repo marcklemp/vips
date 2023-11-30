@@ -1,10 +1,16 @@
 # vips.el
 
-`vips.el` is a simple but powerful Emacs interface for OpenAI's GPT API, text-to-speech API, and DeepL's translation API. This tool allows you to leverage the capabilities of these APIs directly within your Emacs environment.
+`vips.el` is a simple but powerful Emacs interface for
+- OpenAI's GPT and text-to-speech APIs
+- Locally hosted language model APIs using LM Studio or other APIs that behaves like OpenAI's API
+- DeepL's translation API.
+
+This tool allows you to leverage the capabilities of these APIs directly within your Emacs environment.
 
 ## Key Features
 
-- Work directly with OpenAI's LLM models, such as GPT-4 and GPT-4 Turbo, in Emacs.
+- Work directly with OpenAI's LLMs, such as GPT-4 and GPT-4 Turbo, in Emacs.
+- Do the same with locally hosted LLMs.
 - Directly interact with OpenAI's text-to-speech model, enabling the output to be played within Emacs (if your version supports it) or through your operating system's default player.
 - The synthesized speech can be saved as an mp3 file for future reference and use.
 - Customize parameters for OpenAI's API, including max tokens, temperature, top-p, frequency penalty, and presence penalty to fine-tune the output.
@@ -63,9 +69,45 @@ Translate text directly within Emacs using DeepL's powerful translation API.
 
 - `C-c SPC`: Select output language, translate the selected text using DeepL, and append the translation.
 
-Additional functions are available for invocation through `M-x` or by binding them to your own custom keybindings. Below is a list of interactive functions not included in the default keybindings:
+### Local Language Model Support with LM Studio
+
+`vips.el` also includes support for interacting with local language models (LLMs) using LM Studio. This feature allows users to leverage the power of LLMs hosted on their own infrastructure, providing greater control over data privacy and response times.
+
+In fact, ny API that is compatible with OpenAI's GPT API can also be used effortlessly with vips.el. To do this, simply treat your chosen API as an LM Studio model and configure the `vips.el` settings accordingly using the provided LM Studio configuration instructions below.
+
+#### Setting Up LM Studio
+
+The local language model support in `vips.el` is designed to work with [LM Studio](https://lmstudio.ai). Follow the installation and setup guidelines provided by [LM Studio](https://lmstudio.ai) to set it up on your computer or server. Once you have successfully installed and run the service, ensure that it is accessible through the default URL `http://localhost:1234/v1/chat/completions`. If you wish to use a different address for your LM Studio instance, make sure to configure `vips.el` accordingly.
+
+#### Configuring `vips.el` for Local LLMs
+
+To configure `vips.el` to use your local LLM through LM Studio, you need to set the `vips-lmstudio-api-url` variable to the URL of your running LM Studio instance. By default, this is set to `http://localhost:1234/v1/chat/completions`. If your LM Studio instance is running on a different URL, update this variable accordingly:
+
+```emacs-lisp
+(setq vips-lmstudio-api-url "http://your-lm-studio-address:port/v1/chat/completions")
+```
+
+#### Using Local LLMs
+
+Once LM Studio is running and `vips.el` is configured, you can interact with your local LLM using the following functions:
+
+- `vips-chat-region-lmstudio-local-model`: Send selected text to your local LLM and insert the response at the end of the region.
+- `mark-and-run-vips-chat-region-lmstudio-local-model-to-current`: Mark text from the start of the buffer to the current position and send it to your local LLM.
+- `mark-and-run-vips-chat-region-lmstudio-local-model`: Send the entire buffer content to your local LLM.
+
+These functions are integrated into `vips-mode` and can be invoked through keybindings or via `M-x`.
+
+#### Keybindings for Local LLMs
+
+The following keybindings are available when `vips-mode` is active, allowing for quick interaction with your local LLM:
+
+- `C-c l`: Send selected text to the local LLM.
+- `C-c C-l C-c`: Mark text from the start of the buffer to the current position and send it to the local LLM.
+- `C-c C-l C-v`: Send the entire buffer content to the local LLM.
 
 ### Unbound Interactive Functions
+
+Additional functions are available for invocation through `M-x` or by binding them to your own custom keybindings. Below is a list of interactive functions not included in the default keybindings:
 
 #### Voice Selection
 - `vips-select-voice`: Prompt the user to select a voice for text-to-speech synthesis from a predefined list of voices. The selected voice will be used for generating audio from text.
